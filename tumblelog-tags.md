@@ -1,4 +1,4 @@
-2019-10-06 Congratulations!
+5780-07-07 Congratulations!
 
 ---
 tags: [congratulations, unicode]
@@ -63,7 +63,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus vel
 lobortis magna.
 
 %
-2019-10-05 More examples: succulents in a metal bowl, and Tolkien
+5780-07-06 More examples: succulents in a metal bowl, and Tolkien
 
 ---
 tags: [succulent, decoration, photo]
@@ -96,16 +96,41 @@ Some example Perl code:
 print "Hello, world\n";
 ```
 %
-@about[about] 2019-10-05! About
+@about[about] 5780-07-06! About
 
 ## About
 
 Write something about your tumblelog, yourself, etc.
 
 %
-@subscribe[subscribe] 2019-10-05 Subscribe
+@subscribe[subscribe] 5780-07-06 Subscribe
 ## Subscribe
 
 This tumblelog has two feeds: an [RSS feed](/feed.rss) and a [JSON
 feed](/feed.json). Thank you for subscribing!
+%
+@instruments[instruments] 5784-08-18! Instruments
+## My Instruments and Synthesizers
+Do note that this set of tables is a work in progress!
+
+### Analog Instruments
+
+### Electronic/Digital Instruments
+
+### Synthesizers
+
+### Accessories
+
+%
+@systems[systems] 5784-08-18! Systems
+## My Retro, Vintage, and Old Computers
+
+### 8-bit Systems
+
+### 16-bit Systems
+
+### 32-bit Systems
+
+### 64-bit Systems
+
 %

@@ -14,6 +14,8 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from collections import defaultdict, deque
 import yaml
+from pyluach import dates, hebrewcal
+from dateutil import rrule
 try:
     from yaml import CBaseLoader as BaseLoader
 except ImportError:
@@ -58,8 +60,55 @@ def split_year_week(year_week):
 def split_date(date):
     return date.split('-')
 
-def parse_date(date):
+def change_month_to_civil(date):
+   year, month, day = split_date(date)
+   month = int(month)
+   month -= 6
+   if month < 1:
+      month += 12
+   return year + '-' + '%02d'%month + '-' + day
+
+def change_month_to_ecclesiastical(date):
+   year, month, day = split_date(date)
+   month = int(month)
+   month += 6
+   if month > 12:
+      month -= 12
+   return year + '-' + '%02d'%month + '-' + day
+
+def get_year_week_from_hebdate(date):
+   year, week = fetch_year_and_week_from_hebdate(date)
+   return join_year_week(year, week)
+
+def fetch_year_and_week_from_hebdate(date):
+   year, month, day = split_date(date)
+   first_date_of_year = dates.HebrewDate(int(year), 7, 1).to_pydate()
+
+   weekday = first_date_of_year.weekday()
+
+   if weekday < 6:
+      first_date_of_year -= timedelta(days=(weekday + 1))
+
+   current_date = dates.HebrewDate(int(year), int(month), int(day)).to_pydate()
+   return int(year), (rrule.rrule(rrule.WEEKLY,dtstart=first_date_of_year, until=current_date).count())
+
+def get_greg_date_code(date):
+   year, month, day = split_date(date)
+   return dates.HebrewDate(int(year), int(month), int(day)).to_pydate().strftime('%Y-%m-%d')
+
+def parse_date_as_greg(date):
     return datetime.strptime(date, '%Y-%m-%d')
+
+def parse_date_as_heb(date):
+   year, month, day = split_date(date)
+   return dates.HebrewDate(int(year), int(month), int(day))
+
+def get_heb_month_names(year):
+   curYear = hebrewcal.Year(int(year))
+   month_list = []
+   for month in curYear.itermonths():
+      month_list.append(month.month_name())
+   return month_list
 
 def year_week_title(fmt, year, week):
     return fmt.replace('%Y', year).replace('%V', week)
@@ -87,8 +136,11 @@ def collect_days_and_pages(entries):
             title = match.group(2).strip()
             if not title:
                 error(f'A day must have a title ({match.group(1)})')
+            # reverse hebrew date into gregorian date
+            year, month, day = split_date(match.group(1))
             days.append({
-                'date': match.group(1),
+                'date': change_month_to_civil(match.group(1)),
+                #'date': dates.HebrewDate(int(year), int(month), int(day)).to_pydate().strftime('%Y-%m-%d'),
                 'title': title,
                 'articles': [match.group(3)]
             })
@@ -100,10 +152,13 @@ def collect_days_and_pages(entries):
             title = match.group(5).strip()
             if not title:
                 error(f'A page must have a title (@{match.group(1)})')
+            # reverse hebrew date into gregorian date
+            year, month, day = split_date(match.group(3))
             pages.append({
                 'name': match.group(1),
                 'label': match.group(2).strip(),
-                'date': match.group(3),
+                'date': change_month_to_civil(match.group(3)),
+                #'date': dates.HebrewDate(int(year), int(month), int(day)).to_pydate().strftime('%Y-%m-%d'),
                 'show-date': match.group(4) == '!',
                 'title': title,
                 'articles': [match.group(6)]
@@ -124,6 +179,16 @@ def collect_days_and_pages(entries):
     days  = sorted(days,  key=itemgetter('date'), reverse=True)
     pages = sorted(pages, key=itemgetter('date'), reverse=True)
 
+    for day in days:
+      #year, month, daye = split_date(change_month_to_ecclesiastical(day['date']))
+      #day['date'] = dates.HebrewDate(int(year), int(month), int(daye)).to_pydate().strftime('%Y-%m-%d')
+      day['date'] = change_month_to_ecclesiastical(day['date'])
+
+    for page in pages:
+      #year, month, day = split_date(change_month_to_ecclesiastical(page['date']))
+      #page['date'] = dates.HebrewDate(int(year), int(month), int(day)).to_pydate().strftime('%Y-%m-%d')
+      page['date'] = change_month_to_ecclesiastical(page['date'])
+
     return days, pages
 
 def create_archive(days):
@@ -131,7 +196,8 @@ def create_archive(days):
     seen = set()
     archive = defaultdict(deque)
     for day in days:
-        year, week = parse_date(day['date']).isocalendar()[0:2]
+        #year, week = parse_date(day['date']).isocalendar()[0:2]
+        year, week = fetch_year_and_week_from_hebdate(day['date'])
         year_week = join_year_week(year, week)
         if year_week not in seen:
             archive[f'{year:04d}'].appendleft(f'{week:02d}')
@@ -142,7 +208,8 @@ def create_archive(days):
 def html_link_for_day(day, config):
 
     title = escape(day['title'])
-    label = escape(parse_date(day['date']).strftime(config['date-format']))
+    #label = escape(parse_date(day['date']).strftime(config['date-format']))
+    label = escape(format(parse_date_as_heb(day['date']), config['date-format']))
 
     year, month, day_number = split_date(day['date'])
     uri = f'../../{year}/{month}/{day_number}.html'
@@ -202,11 +269,13 @@ def html_for_date(date, date_format, title, path):
     year, month, day = date.split('-')
     uri = f'{path}/{year}/{month}/{day}.html'
 
-    link_text = escape(parse_date(date).strftime(date_format))
+    #link_text = escape(parse_date_as_heb(date).strftime(date_format))
+    link_text = escape(format(parse_date_as_heb(date), '%-d %B %Y'))
+    #link_text = escape(f'{parse_date_as_heb(date):{date_format}}')
     title_text = escape(title)
 
     return (
-        f'<time class="tl-date" datetime="{date}">'
+        f'<time class="tl-date" datetime="{get_greg_date_code(date)}">'
         f'<a href="{uri}" title="{title_text}">{link_text}</a></time>\n'
     )
 
@@ -268,7 +337,7 @@ def html_link_for_day_number(day):
 
 def html_for_row(current_year, dt, row, week_active):
 
-    year, week = dt.isocalendar()[0:2]
+    year, week = fetch_year_and_week_from_hebdate(str(dt))#dt.isocalendar()[0:2]
     if week_active:
         if year == current_year:
             week_html = f'<a href="week/{week:02d}.html">{week}</a>'
@@ -286,7 +355,7 @@ def html_for_row(current_year, dt, row, week_active):
     ])
 
 def html_for_day_names_row():
-    dt = parse_date('2019-01-07') # Monday
+    dt = parse_date_as_greg('2019-01-06') # Sunday
     names = ''
     for _ in range(7):
         day_name = dt.strftime('%a')
@@ -377,7 +446,7 @@ def create_year_pages(days, archive, config, min_year, max_year):
     archive_html = html_for_archive(archive, None, '..', config['label-format'])
 
     day_names_row = html_for_day_names_row()
-    dt = parse_date(f'{start_year}-01-01')
+    dt = parse_date_as_heb(f'{start_year}-07-01')
     it = reversed(days)
     day = next(it)
     date = day['date']
@@ -394,11 +463,11 @@ def create_year_pages(days, archive, config, min_year, max_year):
             week_active = False
             month_active = False
             current_mon = dt.month
-            month_name = dt.strftime('%B')
+            month_name = dt.month_name()
             row = [''] * 7
             while True:
-                wday = dt.weekday()
-                if date == dt.strftime('%Y-%m-%d'):
+                wday = (dt.weekday() - 1)
+                if date == format(dt, ('%Y-%m-%d')):
                     month_active = True
                     week_active = True
                     row[wday] = html_link_for_day_number(day)
@@ -415,7 +484,8 @@ def create_year_pages(days, archive, config, min_year, max_year):
                     week_active = False
                     row = [''] * 7
 
-                dt += timedelta(days=1)
+                dt = dt.add(days=1, rounding=dates.Rounding.NEXT_DAY)
+                #print(dt)
                 if dt.month != current_mon:
                     break
 
@@ -456,18 +526,20 @@ def create_month_pages(days, archive, config, min_year, max_year):
 
     years = defaultdict(lambda: defaultdict(deque))
     for day in days:
-        year, month, _ = split_date(day['date'])
+        year, month, _ = split_date(change_month_to_civil(day['date']))
         years[year][month].appendleft(day)
 
-    month_names = get_month_names()
+    #month_names = get_month_names()
     archive_html = html_for_archive(
         archive, None, '../..', config['label-format'])
 
     for year in sorted(years.keys()):
+        month_names = get_heb_month_names(year)
+        #print(month_names)
         for month in sorted(years[year].keys()):
             days_for_month = years[year][month]
-            first_dt = parse_date(days_for_month[0]['date'])
-            month_name = first_dt.strftime('%B')
+            first_dt = parse_date_as_heb(days_for_month[0]['date'])
+            month_name = format(first_dt,'%B')
             nav_bar = html_for_month_nav_bar(years[year], month, month_names)
             body_html = ''.join([
                 '<div class="tl-topbar"></div>\n'
@@ -481,9 +553,9 @@ def create_month_pages(days, archive, config, min_year, max_year):
                 '</div>\n'
             ])
             create_page(
-                f'archive/{year}/{month}/index.html',
+                f'archive/{year}/{first_dt.month:02d}/index.html',
                 f'{month_name}, {year}', body_html, archive_html, config,
-                first_dt.strftime('%b, %Y'), min_year, max_year
+                format(first_dt, '%B, %Y'), min_year, max_year
             )
 
 def create_week_page(year_week, body_html, archive, config, min_year, max_year):
@@ -505,7 +577,8 @@ def create_week_page(year_week, body_html, archive, config, min_year, max_year):
 def create_day_and_week_pages(days, archive, config, min_year, max_year):
 
     week_body_html = ''
-    current_year_week = get_year_week(days[0]['date'])
+    current_year_week = get_year_week_from_hebdate(days[0]['date'])
+    #print(current_year_week)
     day_archive_html = html_for_archive(
         archive, None, '../..', config['label-format'])
     index = 0
@@ -514,7 +587,8 @@ def create_day_and_week_pages(days, archive, config, min_year, max_year):
             day['date'], config['date-format'], day['title'], '../..'
         ) + ''.join([article['html'] for article in day['articles']])
 
-        label = parse_date(day['date']).strftime(config['date-format'])
+        #label = parse_date(day['date']).strftime(config['date-format'])
+        label = format(parse_date_as_heb(day['date']), config['date-format'])
 
         year, month, day_number = split_date(day['date'])
         next_prev_html = html_for_next_prev(days, index, config)
@@ -528,7 +602,7 @@ def create_day_and_week_pages(days, archive, config, min_year, max_year):
             label, min_year, max_year
         )
 
-        year_week = get_year_week(day['date'])
+        year_week = get_year_week_from_hebdate(day['date'])
         if year_week == current_year_week:
             week_body_html += day_body_html
         else:
@@ -553,10 +627,11 @@ def create_pages(pages, archive, config, min_year, max_year):
 
     for page in pages:
         date = page['date']
-        link_text = escape(parse_date(date).strftime(config['date-format']))
+        #link_text = escape(parse_date(date).strftime(config['date-format']))
+        link_text = escape(format(parse_date_as_heb(date), config['date-format']))
         if page['show-date']:
             body_html = (
-                f'<time class="tl-date" datetime="{date}">{link_text}</time>\n')
+                f'<time class="tl-date" datetime="{get_greg_date_code(date)}">{link_text}</time>\n')
         else:
             body_html = '<div class="tl-topbar"></div>\n'
 
@@ -633,8 +708,8 @@ def create_tag_pages(days, archive, config, min_year, max_year):
 
             current_month = ''
             for row in tags[tag]['years'][year]:
-                dt = parse_date(row['date'])
-                month_name = dt.strftime('%B')
+                dt = parse_date_as_heb(row['date'])
+                month_name = dt.month_name()
                 if month_name != current_month:
                     if current_month:
                         body_html += '  </dl>\n'
@@ -694,7 +769,7 @@ def create_rss_feed(days, config):
     for day in days:
         (url, title, description) = get_url_title_description(day, config)
 
-        end_of_day = get_end_of_day(day['date'])
+        end_of_day = get_end_of_day(get_greg_date_code(day['date']))
         # RFC #822 in USA locale
         ctime = end_of_day.ctime()
         pub_date = (f'{ctime[0:3]}, {end_of_day.day:02d} {ctime[4:7]}'
@@ -743,7 +818,7 @@ def create_json_feed(days, config):
     for day in days:
         (url, title, description) = get_url_title_description(day, config)
 
-        end_of_day = get_end_of_day(day['date'])
+        end_of_day = get_end_of_day(get_greg_date_code(day['date']))
         date_published = str(end_of_day).replace(' ', 'T')
 
         items.append({
@@ -959,7 +1034,7 @@ def create_blog(config):
         convert_articles_to_html(days)
     convert_articles_to_html(pages)
 
-    max_year = datetime.now().year
+    max_year = dates.HebrewDate.today().year#datetime.now().year
     if config['min-year'] is not None:
         min_year = config['min-year']
     else:
@@ -1025,7 +1100,7 @@ def create_argument_parser():
     parser.add_argument('--date-format', dest='date-format',
                         help='how to format the date;'
                         " default: '%(default)s'",
-                        metavar='FORMAT', default='%d %b %Y')
+                        metavar='FORMAT', default='%d %B %Y')
     parser.add_argument('--label-format', dest='label-format',
                         help='how to format the label;'
                         "default '%(default)s'",

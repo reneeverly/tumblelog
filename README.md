@@ -22,7 +22,7 @@ sudo apt install -y git sass python3-pip
 
 For macOS:
 ```bash
-brew install sass
+brew install sass/sass/sass
 brew install pip3
 ```
 
@@ -33,6 +33,7 @@ cd tumblelog
 python3 -m venv venv
 pip3 install commonmark
 pip3 install regex
+pip3 install pyyaml
 source venv/bin/activate
 mkdir htdocs
 ```
@@ -42,7 +43,7 @@ Generate a stylesheet. I use *steel* for example. See the directory
 underscore).
 
 ```bash
-sass --sourcemap=none -t compressed styles/steel.scss htdocs/steel.css
+sass --no-source-map --style=compressed styles/steel.scss htdocs/steel.css
 ```
 
 To generate a version of the example site that *does not use tags* use:

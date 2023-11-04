@@ -62,19 +62,27 @@ def split_date(date):
 
 def change_month_to_civil(date):
    year, month, day = split_date(date)
-   month = int(month)
+   return year + '-' + quick_month_to_civil(month) + '-' + day
+
+def quick_month_to_civil(month_number):
+   month = int(month_number)
    month -= 6
    if month < 1:
       month += 12
-   return year + '-' + '%02d'%month + '-' + day
+   return '%02d'%month
+   
 
 def change_month_to_ecclesiastical(date):
    year, month, day = split_date(date)
-   month = int(month)
+   return year + '-' + quick_month_to_ecclesiastical(month) + '-' + day
+
+def quick_month_to_ecclesiastical(month_number):
+   month = int(month_number)
    month += 6
    if month > 12:
       month -= 12
-   return year + '-' + '%02d'%month + '-' + day
+   return '%02d'%month
+
 
 def get_year_week_from_hebdate(date):
    year, week = fetch_year_and_week_from_hebdate(date)
@@ -372,7 +380,7 @@ def html_for_month_nav_bar(active_months, current_month, names):
             if month == current_month:
                 html += f'      <li class="tl-self">{name}</li>\n'
             else:
-                html += f'      <li><a href="../{month}/">{name}</a></li>\n'
+                html += f'      <li><a href="../{quick_month_to_ecclesiastical(month)}/">{name}</a></li>\n'
         else:
             html += f'      <li>{name}</li>\n'
 

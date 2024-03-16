@@ -74,13 +74,19 @@ def quick_month_to_civil(month_number):
 
 def change_month_to_ecclesiastical(date):
    year, month, day = split_date(date)
-   return year + '-' + quick_month_to_ecclesiastical(month) + '-' + day
+   return year + '-' + quick_month_to_ecclesiastical(month, year) + '-' + day
 
-def quick_month_to_ecclesiastical(month_number):
+def quick_month_to_ecclesiastical(month_number, year_number):
    month = int(month_number)
+   year = int(year_number)
+   # fix to account for Adar II
    month += 6
-   if month > 12:
-      month -= 12
+   if hebrewcal.Year(year).monthscount() > 12:
+      if month > 13:
+         month -= 13
+   else:
+      if month > 12:
+         month -= 12
    return '%02d'%month
 
 
@@ -152,6 +158,7 @@ def collect_days_and_pages(entries):
                 'title': title,
                 'articles': [match.group(3)]
             })
+            print("Currently on " + match.group(2) + ", with date: " + match.group(1) + ", which maps to: " + change_month_to_civil(match.group(1)))
             state = 'date-title'
             continue
 
@@ -171,6 +178,7 @@ def collect_days_and_pages(entries):
                 'title': title,
                 'articles': [match.group(6)]
             })
+            print("Currently on " + match.group(1) + ", with date: " + match.group(3))
             state = 'at-page-title'
             continue
 
@@ -371,7 +379,7 @@ def html_for_day_names_row():
         dt += timedelta(days=1)
     return f'      <tr>\n        <td></td>\n{names}      </tr>\n'
 
-def html_for_month_nav_bar(active_months, current_month, names):
+def html_for_month_nav_bar(active_months, current_month, names, year):
     html = '  <nav>\n    <ul class="tl-month-navigation">\n'
     for mon in range(1, 13):
         month = f'{mon:02d}'
@@ -380,7 +388,7 @@ def html_for_month_nav_bar(active_months, current_month, names):
             if month == current_month:
                 html += f'      <li class="tl-self">{name}</li>\n'
             else:
-                html += f'      <li><a href="../{quick_month_to_ecclesiastical(month)}/">{name}</a></li>\n'
+                html += f'      <li><a href="../{quick_month_to_ecclesiastical(month, year)}/">{name}</a></li>\n'
         else:
             html += f'      <li>{name}</li>\n'
 
@@ -548,7 +556,7 @@ def create_month_pages(days, archive, config, min_year, max_year):
             days_for_month = years[year][month]
             first_dt = parse_date_as_heb(days_for_month[0]['date'])
             month_name = format(first_dt,'%B')
-            nav_bar = html_for_month_nav_bar(years[year], month, month_names)
+            nav_bar = html_for_month_nav_bar(years[year], month, month_names, year)
             body_html = ''.join([
                 '<div class="tl-topbar"></div>\n'
                 '<div class="tl-month-overview">\n'
